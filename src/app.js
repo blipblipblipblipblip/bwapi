@@ -188,4 +188,4 @@ async function main() {
 // Run main
 main().catch((err) => console.error("Server failed:", err));
 
-export default null; // export something to satisfy ES module
+export default app; // export something to satisfy ES module
