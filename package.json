@@ -5,12 +5,11 @@
   "repository": "https://github.com/zenith391/bwapi",
   "type": "module",
   "main": "dist/main.js",
-  "scripts": {
-    "build": "tsc",
-    "start": "npm run build && node --trace-warnings --unhandled-rejections=strict dist/main.js",
-    "test": "npm run build && mocha --exit",
-    "format": "npx prettier . --write"
-  },
+"scripts": {
+  "start": "node src/main.js",
+  "test": "mocha --exit",
+  "format": "npx prettier . --write"
+},
   "author": "zenith391",
   "license": "MIT",
   "dependencies": {
