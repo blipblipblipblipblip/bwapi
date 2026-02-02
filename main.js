@@ -1,4 +1,4 @@
-import app from "./src/modules/app.js"; // Ensure this path is correct on GitHub!
+import app from "./src/app.js"; // Ensure this path is correct on GitHub!
 import serverline from "serverline";
 import fs from "fs";
 import http from "http";
