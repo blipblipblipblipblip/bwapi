@@ -1,97 +1,71 @@
 import { User } from "./users.js";
-import { Request } from "express";
+import { Request, Response } from "express";
 import { Database } from "sqlite";
 
+// --- BWRequest typing ---
 export interface BWRequest extends Request {
-  files: any;
-  db: Database;
+  files?: any;
+  db?: Database;
 }
 
-// Get the auth token from a request object
-export function getAuthToken(req: any): string | undefined {
-  const authToken = req.headers["bw-auth-token"];
-  return authToken;
+// --- Get auth token from request ---
+export function getAuthToken(req: BWRequest): string | undefined {
+  return req.headers["bw-auth-token"] as string | undefined;
 }
 
-// just internally used helper functions
-export function value2(v: string) {
-  if (typeof v == "object") {
-    return v[0];
-  } else {
-    return v;
-  }
+// --- Helper functions ---
+export function value2(v: any): any {
+  if (v == null) return null;
+  return typeof v === "object" ? v[0] : v;
 }
 
 interface RequestBody {
-  [index: string]: string;
+  [index: string]: any;
 }
 
-// Internally used
-export function value(body: RequestBody, name: string) {
-  let v = body[name];
-  if (typeof v == "object") {
-    return v[0];
-  } else {
-    return v;
-  }
+export function value(body: RequestBody, name: string): any {
+  const v = body[name];
+  return v == null ? null : typeof v === "object" ? v[0] : v;
 }
 
-type ValidAuthToken = {
+// --- Validate auth token ---
+export type ValidAuthToken = {
   ok: boolean;
-  user: User;
-  authToken: string;
+  user?: User;
+  authToken?: string;
 };
 
-// Function used to validate an user's auth token and get to whom it belongs.
 export function validAuthToken(
-  req: any,
-  res: any,
-  bodyCheck: boolean,
+  req: BWRequest,
+  res: Response,
+  bodyCheck: boolean
 ): ValidAuthToken {
-  let authToken = getAuthToken(req);
-  if (authToken === undefined) {
-    res.status(405).json({
-      error: 405,
-      error_msg: "missing authentication token",
-    });
-    return { ok: false, user: new User(0), authToken: "" };
+  const authToken = getAuthToken(req);
+  if (!authToken) {
+    res.status(405).json({ error: 405, error_msg: "missing authentication token" });
+    return { ok: false };
   }
-  let userId = ((global as any).authTokens as any)[authToken] as number;
+
+  const userId = (global as any).authTokens?.[authToken];
   if (userId == undefined) {
-    res.status(405).json({
-      error: 405,
-      error_msg: "unauthentificated user",
-    });
-    return { ok: false, user: new User(0), authToken: "" };
+    res.status(405).json({ error: 405, error_msg: "unauthenticated user" });
+    return { ok: false };
   }
-  if (bodyCheck && (req.body == undefined || req.body == null)) {
-    res.status(400).json({
-      error: "no body",
-    });
-    return { ok: false, user: new User(0), authToken: "" };
+
+  if (bodyCheck && (!req.body || Object.keys(req.body).length === 0)) {
+    res.status(400).json({ error: "no body" });
+    return { ok: false };
   }
-  return {
-    ok: true,
-    user: new User(userId),
-    authToken: authToken,
-  };
+
+  return { ok: true, user: new User(userId), authToken };
 }
 
-// Helper function for ISO date formatting
-function datePart(num: number) {
-  let str = num.toString();
-  if (str.length < 2) {
-    str = "0" + str;
-  }
-  return str;
-}
+// --- ISO Date string helper ---
+export function dateString(date?: Date): string {
+  if (!date) date = new Date();
+  const datePart = (n: number) => (n < 10 ? "0" + n : "" + n);
 
-// Format a 'Date' object in ISO format.
-export function dateString(date?: Date) {
-  if (date === undefined || date === null) {
-    date = new Date(); // default to current date
-  }
-  let currDateStr =
+  return (
     date.getUTCFullYear() +
     "-" +
     datePart(date.getUTCMonth() + 1) +
@@ -102,17 +76,16 @@ export function dateString(date?: Date) {
     ":" +
     datePart(date.getUTCMinutes()) +
     ":" +
-    datePart(date.getSeconds()) +
-    "+00:00";
-  return currDateStr;
+    datePart(date.getUTCSeconds()) +
+    "+00:00"
+  );
 }
 
-// Two-level deep clone of the given array
+// --- Two-level deep clone of array ---
 export function cloneArray<Type>(array: Type[]): Type[] {
-  // return array.map(a => { return {...a}; });
-  let newArray: Type[] = [];
+  const newArray: Type[] = [];
   for (const value of array) {
-    if (typeof value === "object") {
+    if (typeof value === "object" && value !== null) {
       newArray.push(Object.assign({}, value));
     } else {
       newArray.push(value);
