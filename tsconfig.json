@@ -1,13 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "node18",
-    "outDir": "dist",
-    "rootDir": "src",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "strict": false
+    "target": "ES2020",             // keeps modern JS features
+    "module": "node18",             // supports import.meta and top-level await
+    "outDir": "dist",               // compiled JS goes here
+    "rootDir": "src",               // source files
+    "esModuleInterop": true,        // allows import express from "express"
+    "skipLibCheck": true,           // avoids errors in @types packages
+    "strict": false,                // optional, can enable later
+    "moduleResolution": "node",     // ensures proper module resolution
+    "resolveJsonModule": true       // allows import of JSON files
   },
-  "include": ["src"]
-  "exclude": ["node_modules"]
+  "include": ["src"],
+  "exclude": ["node_modules"]       // important for performance & errors
 }
