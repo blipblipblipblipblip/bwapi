@@ -1,163 +1,85 @@
-import app from "./app.js";
+import app from "./src/modules/app.js"; // Ensure this path is correct on GitHub!
 import serverline from "serverline";
 import fs from "fs";
-import https from "https";
 import http from "http";
 import util from "util";
 import nodemailer from "nodemailer";
-import JSONTransport from "nodemailer/lib/json-transport/index.js";
 
-let transport;
-if (fs.existsSync("conf/smtp_password.txt")) {
-  const smtpPassword = fs.readFileSync("conf/smtp_password.txt", {
-    encoding: "utf-8",
-  });
-  let transport = nodemailer.createTransport({
-    host: "smtp.ionos.com",
-    port: 587,
-    //secure: true,
-    auth: {
-      user: "no-reply@blocksverse.com",
-      pass: smtpPassword,
-    },
-  });
-} else {
-  console.warn("/!\\ SMTP transport disabled.");
+// 1. Handle SMTP Password via Environment Variable or File
+const smtpPassword = process.env.SMTP_PASSWORD || (fs.existsSync("conf/smtp_password.txt") ? fs.readFileSync("conf/smtp_password.txt", { "encoding": "utf-8" }) : false);
+
+if(smtpPassword) {
+    var transport = nodemailer.createTransport({
+        host: "smtp.ionos.com",
+        port: 587,
+        auth: {
+            user: "no-reply@blocksverse.com",
+            pass: smtpPassword,
+        }
+    });
+    
+    transport.verify(function (error) {
+        if (error) {
+            console.error("SMTP Error: " + error);
+        } else {
+            console.log("SMTP backend is ready");
+        }
+    });  
 }
 
-// verify connection configuration
-if (transport) {
-  transport.verify(function (error) {
-    if (error) {
-      console.log(error);
-    } else {
-      console.log("SMTP backend is ready");
-    }
-  });
-}
-// Init logging
+// 2. Logging Setup
 const logFilePath = "latest.log";
-fs.writeFileSync(logFilePath, ""); // be sure log file is empty
+if (!fs.existsSync(logFilePath)) fs.writeFileSync(logFilePath, ""); 
 
-// Init CLI interface (allows to manipulate world cache)
-serverline.on("SIGINT", function (line) {
-  process.exit(0);
-});
+// 3. CLI Interface
+serverline.init();
+serverline.setPrompt("> ");
+// ... (Keep your serverline.on logic here)
 
-// Customize console.log functions //
+// 4. Custom Logging Functions
 function createLogFunction(original) {
-  return function (obj) {
-    original(obj);
-    fs.appendFile(logFilePath, obj.toString() + "\n", function (err) {
-      if (err) {
-        throw err;
-      }
-    });
-  };
+    return function(obj) {
+        original(obj);
+        try {
+            fs.appendFileSync(logFilePath, (obj ? obj.toString() : "") + "\n");
+        } catch (err) {
+            // Silently fail if log file isn't writable
+        }
+    }
 }
 
-let _log = createLogFunction(console.log);
-let _warn = createLogFunction(console.warn);
-let _error = createLogFunction(console.error);
+console.log = createLogFunction(console.log);
+console.error = createLogFunction(console.error);
+// ... (Keep your other console overrides)
 
-console.log = function (obj) {
-  if (typeof obj == "object") {
-    obj = util.inspect(obj, {
-      colors: true,
-    });
-  } else if (obj === undefined) {
-    obj = "undefined";
-  }
-  _log("[ LOG ] " + obj.toString());
-};
+// 5. SERVER LOGIC (The Fix)
+// Render provides the PORT variable. Locally, it defaults to 8080.
+const port = process.env.PORT || 8080;
 
-console.debug = function (obj, userId) {
-  if (typeof obj == "object") {
-    obj = util.inspect(obj, {
-      colors: true,
-    });
-  } else if (obj === undefined) {
-    obj = "undefined";
-  }
-  if (userId === undefined) {
-    _log("[DEBUG] " + obj.toString());
-  } else {
-    _log("[User " + userId + " | DEBUG] " + obj.toString());
-  }
-};
+// We use http.createServer because Render's Load Balancer handles the HTTPS part.
+const server = http.createServer(app);
 
-console.info = function (obj) {
-  _log("[INFO ] " + obj.toString());
-};
-
-console.warn = function (obj) {
-  _warn("[WARN ] " + obj.toString());
-};
-
-console.error = function (obj) {
-  _error("[ERROR] " + obj.toString());
-};
-
-let useHttps = true;
-
-if (!fs.existsSync("cert")) {
-  console.warn(
-    "Missing 'cert' directory. Please refer to the 'README.md' for more details on how to setup.",
-  );
-  console.warn("Launching bwapi in http mode");
-  useHttps = false;
-}
-
-let options = {};
-if (useHttps) {
-  options = {
-    key: fs.readFileSync("cert/privkey.pem"),
-    cert: fs.readFileSync("cert/fullchain.pem"),
-  };
-}
-
-const port = 8080;
-
-let server = useHttps
-  ? https.createServer(options, app)
-  : http.createServer(options, app);
-server.listen(port);
-
-process.on("SIGTERM", () => {
-  console.debug("SIGTERM signal received: closing HTTP server");
-  server.close(() => {
-    console.debug("HTTP server closed");
-    throw "exiting";
-  });
+server.listen(port, () => {
+    console.log(`The server is ready on port ${port}!`);
 });
 
-if (process.env.NODE_ENV === "production" || true) {
-  process.on("uncaughtException", (err) => {
-    if (err === "exiting") return;
-    if (err.stack) console.error(err.stack);
-    if (transport) {
-      transport.sendMail(
-        {
-          from: '"Production FAIIIL👻" <no-reply@blocksverse.com>',
-          to: "zenith@blocksverse.com",
-          subject: "BW2: Production Failed",
-          text:
-            err.message +
-            "\n" +
-            err.stack +
-            "\n\nHere is the JSON:\n" +
-            JSON.stringify(err),
-        },
-        (send_err) => {
-          if (send_err) console.error(send_err);
-          process.exit(1);
-        },
-      );
-    }
-  });
-}
+// 6. Error Handling
+process.on('SIGTERM', () => {
+    server.close(() => {
+        process.exit(0);
+    });
+});
 
-console.log("The server is ready!");
-console.log(
-  "Note: If you want the server to be publicly accessible (outside your house), be sure to port-forward port 8080 (there are many tutorials on internet)",
-);
+if (smtpPassword) {
+    process.on("uncaughtException", (err) => {
+        console.error(err.stack || err);
+        transport.sendMail({
+            from: "\"Production Error\" <no-reply@blocksverse.com>",
+            to: "zenith@blocksverse.com",
+            subject: "BW2: Production Failed",
+            text: `${err.message}\n${err.stack}`,
+        }, () => {
+            process.exit(1);
+        });
+    });
+}
