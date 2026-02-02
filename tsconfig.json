@@ -7,7 +7,6 @@
     "esModuleInterop": true,        // allows import express from "express"
     "skipLibCheck": true,           // avoids errors in @types packages
     "strict": false,                // optional, can enable later
-    "moduleResolution": "node",     // ensures proper module resolution
     "resolveJsonModule": true       // allows import of JSON files
   },
   "include": ["src"],
