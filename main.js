@@ -1,4 +1,4 @@
-import app from "./app.js"; 
+import app from "./dist/app.js"; 
 import serverline from "serverline";
 import fs from "fs";
 import http from "http";
